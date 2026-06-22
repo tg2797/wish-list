@@ -12,15 +12,22 @@ try {
 const { chromium } = pw;
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { extname, join } from 'node:path';
 
 const ROOT = process.cwd();
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+};
 const server = createServer(async (req, res) => {
   try {
     let p = req.url.split('?')[0];
     if (p === '/') p = '/index.html';
     const data = await readFile(join(ROOT, p));
-    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.writeHead(200, { 'Content-Type': MIME[extname(p)] || 'application/octet-stream' });
     res.end(data);
   } catch {
     res.writeHead(404);
@@ -60,14 +67,17 @@ await page.waitForTimeout(400);
 ok('シートが開く', await page.locator('#shItem.show').isVisible());
 await page.fill('#inName', 'AirPods Pro');
 await page.fill('#inPrice', '39800');
-await page.tap('#prioPick button[data-p="high"]');
+await page.tap('#starPick button[data-v="4"]'); // 星4つ
+ok('星ピッカーが4つ点灯', (await page.locator('#starPick button.filled').count()) === 4);
 await page.fill('#inUrl', 'example.com/airpods'); // スキーム無し → https:// が補われる
 await page.tap('#saveBtn');
 await page.waitForSelector('.item');
 ok('1件追加された', (await page.locator('.item').count()) === 1);
 ok('名前表示', (await page.locator('.item-name').first().textContent()) === 'AirPods Pro');
+ok('カードに星4つ', (await page.locator('.item-stars').first().locator('svg').count()) === 4);
 ok('価格フォーマット', (await page.locator('.item-price').first().textContent()).includes('¥39,800'));
 ok('合計に反映', (await page.locator('#totalWant').textContent()).includes('39,800'));
+ok('登録数=1', (await page.locator('#statCount').textContent()) === '1');
 const href = await page.locator('.item-link').first().getAttribute('href');
 ok('URLにhttps://が補完される', href === 'https://example.com/airpods');
 
@@ -100,6 +110,7 @@ await page.waitForSelector('.item.done');
 ok('doneクラスが付く', (await page.locator('.item.done').count()) >= 1);
 ok('チェックのSVGが表示', (await page.locator('.check.done svg.ic-svg').count()) >= 1);
 ok('達成率が0%超', (await page.locator('#statRate').textContent()) !== '0%');
+ok('購入済みカウント≥1', parseInt(await page.locator('#statBought').textContent(), 10) >= 1);
 
 console.log('\n[フィルタ]');
 await page.tap('.seg button[data-filter="bought"]');
@@ -169,6 +180,30 @@ ok('スワイプ→削除で1件減る', (await page.locator('.item').count()) =
 console.log('\n[永続化]');
 await page.reload({ waitUntil: 'networkidle' });
 ok('リロード後もデータが残る', (await page.locator('.item').count()) >= 1);
+
+console.log('\n[PWA]');
+ok('manifestがリンクされている', (await page.locator('link[rel="manifest"]').count()) === 1);
+ok('apple-touch-iconがある', (await page.locator('link[rel="apple-touch-icon"]').count()) === 1);
+const checkRes = async (path, type) => {
+  const r = await page.request.get(base + '/' + path);
+  return r.status() === 200 && (!type || (r.headers()['content-type'] || '').includes(type));
+};
+ok('manifest取得OK', await checkRes('manifest.webmanifest'));
+const manifest = await (await page.request.get(base + '/manifest.webmanifest')).json();
+ok('manifestにアイコン3種', Array.isArray(manifest.icons) && manifest.icons.length >= 3);
+ok('sw.js取得OK', await checkRes('sw.js'));
+ok('icon-192.png取得OK', await checkRes('icon-192.png', 'image/png'));
+ok('icon-512.png取得OK', await checkRes('icon-512.png', 'image/png'));
+ok('icon-180.png取得OK', await checkRes('icon-180.png', 'image/png'));
+const swReady = await page.evaluate(() =>
+  navigator.serviceWorker
+    ? Promise.race([
+        navigator.serviceWorker.ready.then(() => true),
+        new Promise((r) => setTimeout(() => r(false), 5000)),
+      ])
+    : false
+);
+ok('Service Worker が有効化される', swReady === true);
 
 console.log('\n[コンソールエラー]');
 ok('エラーなし', errors.length === 0);

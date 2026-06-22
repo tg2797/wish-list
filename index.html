@@ -10,6 +10,8 @@
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <title>欲しいものリスト</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23007aff' d='M12 21S4 14.5 4 8.5A4.5 4.5 0 0 1 12 6a4.5 4.5 0 0 1 8 2.5C20 14.5 12 21 12 21z'/%3E%3C/svg%3E">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -159,14 +161,19 @@
   .field.invalid .hint { display:block; }
   .field.invalid input { outline:2px solid #ff3b30; }
 
-  .prio-pick { display:flex; gap:8px; }
-  .prio-pick button {
-    flex:1; padding:13px 0; border-radius:13px; border:2px solid transparent; background:#ffffff;
-    font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; color:#8e8e93; transition:all 0.18s;
+  .star-pick { display:flex; gap:4px; }
+  .star-pick button {
+    flex:0 0 auto; width:52px; height:52px; padding:10px; border:none; background:transparent;
+    cursor:pointer; color:#d1d1d6; transition:transform 0.12s, color 0.15s;
   }
-  .prio-pick button.on-h { background:#ffe5e3; border-color:#ff3b30; color:#ff3b30; }
-  .prio-pick button.on-m { background:#fff0db; border-color:#ff9500; color:#ff9500; }
-  .prio-pick button.on-l { background:#e3f0ff; border-color:#007aff; color:#007aff; }
+  .star-pick button.filled { color:#ffb400; }
+  .star-pick button:active { transform:scale(0.85); }
+  .star-pick .ic-svg { width:100%; height:100%; }
+
+  .item-stars { display:inline-flex; gap:1px; color:#ffb400; }
+  .item-stars .ic-svg { width:14px; height:14px; }
+  .group-label .gstars { display:inline-flex; gap:1px; color:#ffb400; }
+  .group-label .gstars .ic-svg { width:15px; height:15px; }
 
   .cat-pick { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; }
   .cat-pick::-webkit-scrollbar { display:none; }
@@ -238,10 +245,9 @@
     .sheet { background:#1c1c1e; }
     .field input { background:#2c2c2e; color:#ffffff; color-scheme:dark; -webkit-text-fill-color:#ffffff; }
     .field input::placeholder { color:#636366; -webkit-text-fill-color:#636366; }
-    .prio-pick button, .cat-pick .cchip { background:#2c2c2e; }
-    .prio-pick button.on-h { background:#3a1c1a; }
-    .prio-pick button.on-m { background:#3a2a14; }
-    .prio-pick button.on-l { background:#142a4a; }
+    .cat-pick .cchip { background:#2c2c2e; }
+    .star-pick button { color:#48484a; }
+    .star-pick button.filled { color:#ffb400; }
     .cat-pick .cchip { color:#ffffff; }
     .cat-list-box, .sort-box { background:#2c2c2e; }
     .cat-row, .sort-row { border-bottom:0.5px solid rgba(255,255,255,0.1); }
@@ -267,8 +273,8 @@
     <div class="label">欲しいもの合計</div>
     <div class="total" id="totalWant">¥0</div>
     <div class="row">
-      <div class="stat"><div class="n" id="statCount">0</div><div class="t">アイテム数</div></div>
-      <div class="stat"><div class="n" id="statBought">¥0</div><div class="t">購入済み</div></div>
+      <div class="stat"><div class="n" id="statCount">0</div><div class="t">登録数</div></div>
+      <div class="stat"><div class="n" id="statBought">0</div><div class="t">購入済み</div></div>
       <div class="stat"><div class="n" id="statRate">0%</div><div class="t">達成率</div></div>
     </div>
     <div class="progressbar"><div id="progress"></div></div>
@@ -301,10 +307,11 @@
   <div class="field"><label>値段</label><input id="inPrice" type="number" inputmode="numeric" min="0" placeholder="¥ いくら？"></div>
   <div class="field"><label>カテゴリ</label><div class="cat-pick" id="catPick"></div></div>
   <div class="field"><label>優先度</label>
-    <div class="prio-pick" id="prioPick">
-      <button data-p="high">高</button>
-      <button data-p="mid" class="on-m">中</button>
-      <button data-p="low">低</button>
+    <div class="star-pick" id="starPick" role="radiogroup" aria-label="優先度（星4つまで）">
+      <button type="button" data-v="1" aria-label="星1"></button>
+      <button type="button" data-v="2" aria-label="星2"></button>
+      <button type="button" data-v="3" aria-label="星3"></button>
+      <button type="button" data-v="4" aria-label="星4"></button>
     </div>
   </div>
   <div class="field"><label>メモ（任意）</label><input id="inMemo" type="text" placeholder="色・サイズ・お店など" autocomplete="off" maxlength="200"></div>
@@ -358,10 +365,21 @@
     plus:     '<path d="M12 5v14"/><path d="M5 12h14"/>',
     trash:    '<path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/>',
     gift:     '<path d="M19 11.5V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8.5"/><rect x="3.2" y="7.5" width="17.6" height="4" rx="1"/><path d="M12 7.5V21"/><path d="M12 7.5S10.5 3 8 3.6 7.2 7.5 12 7.5z"/><path d="M12 7.5S13.5 3 16 3.6 16.8 7.5 12 7.5z"/>',
-    bag:      '<path d="M6 8h12l-1 11.5a1.5 1.5 0 0 1-1.5 1.4H8.5A1.5 1.5 0 0 1 7 19.5L6 8z"/><path d="M9 8.5V6.5a3 3 0 0 1 6 0v2"/>'
+    bag:      '<path d="M6 8h12l-1 11.5a1.5 1.5 0 0 1-1.5 1.4H8.5A1.5 1.5 0 0 1 7 19.5L6 8z"/><path d="M9 8.5V6.5a3 3 0 0 1 6 0v2"/>',
+    star:     '<path d="M12 3.2l2.65 5.37 5.93.86-4.29 4.18 1.01 5.9L12 17.6 6.69 19.6l1.01-5.9L3.41 9.43l5.93-.86z"/>'
   };
   function svg(name){
     return '<svg class="ic-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICON[name]||"") + '</svg>';
+  }
+  // 星（filled=中を塗る）。色は親要素の color で制御
+  function starSVG(filled){
+    return '<svg class="ic-svg" viewBox="0 0 24 24" fill="' + (filled?"currentColor":"none") + '" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON.star + '</svg>';
+  }
+  var STAR_MAX = 4;
+  // カード/見出し用：塗りつぶし星をn個
+  function starsHTML(n, cls){
+    var h=''; for(var i=0;i<n;i++){ h+=starSVG(true); }
+    return '<span class="'+(cls||"item-stars")+'">'+h+'</span>';
   }
 
   var KEY = "wishlist_app_v1";
@@ -372,17 +390,12 @@
   var catFilter = "all";   // "all" | catId | "none"
   var sortMode = "prio";   // prio | cat | priceDesc | priceAsc
   var editingId = null;
-  var pickPrio = "mid";
+  var pickPrio = 3;        // 優先度の星の数（1〜4）
   var pickCat = null;      // catId or null
   var ceEditingId = null;
   var ceColor = "#007aff";
   var afterCatSave = null;
 
-  var PRIO = {
-    high: { label:"高", color:"#ff3b30", order:0 },
-    mid:  { label:"中", color:"#ff9500", order:1 },
-    low:  { label:"低", color:"#007aff", order:2 }
-  };
   var SORTS = [
     { k:"prio",      icon:"flag",      label:"優先度順" },
     { k:"cat",       icon:"grid",      label:"カテゴリ順" },
@@ -412,7 +425,11 @@
     var name = String(raw.name||"").trim();
     if(!name) return null;
     var price = parseInt(raw.price,10); if(isNaN(price)||price<0) price=0;
-    var prio = PRIO[raw.prio] ? raw.prio : "mid";
+    // 旧データ(high/mid/low)を星の数(1〜4)へ移行
+    var prio = raw.prio;
+    if(prio==="high") prio=4; else if(prio==="mid") prio=3; else if(prio==="low") prio=2;
+    prio = parseInt(prio,10); if(isNaN(prio)) prio=3;
+    prio = Math.max(1, Math.min(STAR_MAX, prio));
     return {
       id: typeof raw.id==="string" && raw.id ? raw.id : ("w"+Date.now()+Math.floor(Math.random()*100000)),
       name: name.slice(0,100),
@@ -482,8 +499,8 @@
     var rate = totalSum>0 ? Math.round(boughtSum/totalSum*100) : 0;
 
     document.getElementById("totalWant").textContent = yen(wantSum);
-    document.getElementById("statCount").textContent = want.length;
-    document.getElementById("statBought").textContent = yen(boughtSum);
+    document.getElementById("statCount").textContent = items.length;
+    document.getElementById("statBought").textContent = bought.length;
     document.getElementById("statRate").textContent = rate + "%";
     document.getElementById("progress").style.width = rate + "%";
     document.getElementById("sub").textContent = items.length + "件のアイテム";
@@ -537,8 +554,8 @@
   function sortArr(arr, mode){
     if(mode==="priceDesc"){ arr.sort(function(a,b){ return (b.price||0)-(a.price||0); }); }
     else if(mode==="priceAsc"){ arr.sort(function(a,b){ return (a.price||0)-(b.price||0); }); }
-    else if(mode==="cat"){ arr.sort(function(a,b){ return catOrder(a.catId)-catOrder(b.catId) || PRIO[a.prio].order-PRIO[b.prio].order || (b.price||0)-(a.price||0); }); }
-    else { arr.sort(function(a,b){ return PRIO[a.prio].order-PRIO[b.prio].order || (b.price||0)-(a.price||0); }); }
+    else if(mode==="cat"){ arr.sort(function(a,b){ return catOrder(a.catId)-catOrder(b.catId) || (b.prio||0)-(a.prio||0) || (b.price||0)-(a.price||0); }); }
+    else { arr.sort(function(a,b){ return (b.prio||0)-(a.prio||0) || (b.price||0)-(a.price||0); }); }
   }
 
   function renderGroups(arr, mode, isDone){
@@ -560,8 +577,7 @@
           var col = c ? c.color : "#8e8e93";
           out2 += '<div class="group-label"><span class="dot" style="background:'+col+';"></span>'+esc(nm)+'<span class="gsum">'+yen(sum)+'</span></div>';
         } else {
-          var p = PRIO[it.prio];
-          out2 += '<div class="group-label"><span class="dot" style="background:'+p.color+';"></span>優先度 '+p.label+'<span class="gsum">'+yen(sum)+'</span></div>';
+          out2 += '<div class="group-label">'+starsHTML(it.prio,"gstars")+'<span class="gsum">'+yen(sum)+'</span></div>';
         }
         lastKey = key;
       }
@@ -573,9 +589,7 @@
   function itemHTML(it){
     var c = getCat(it.catId);
     var bar = c ? 'box-shadow:inset 5px 0 0 0 '+c.color+';' : '';
-    var pills = '';
-    var p = PRIO[it.prio];
-    pills += '<span class="pill" style="background:'+hexA(p.color,0.14)+';color:'+p.color+';"><span class="pdot" style="background:'+p.color+';"></span>'+p.label+'</span>';
+    var pills = starsHTML(it.prio, "item-stars");
     if(c){ pills += '<span class="pill" style="background:'+hexA(c.color,0.14)+';color:'+c.color+';">'+esc(c.name)+'</span>'; }
     var memo = it.memo ? '<div class="item-memo">'+esc(it.memo)+'</div>' : '';
     var u = safeUrl(it.url);
@@ -655,14 +669,23 @@
   var inMemo=document.getElementById("inMemo"), inUrl=document.getElementById("inUrl");
   var fldName=document.getElementById("fldName"), fldUrl=document.getElementById("fldUrl");
 
-  function setPrio(p){
-    pickPrio=p;
-    document.querySelectorAll("#prioPick button").forEach(function(b){
-      b.className=""; if(b.getAttribute("data-p")===p){ b.className = p==="high"?"on-h":p==="mid"?"on-m":"on-l"; }
+  function setPrio(n){
+    n = Math.max(1, Math.min(STAR_MAX, parseInt(n,10)||1));
+    pickPrio = n;
+    document.querySelectorAll("#starPick button").forEach(function(b){
+      var v = parseInt(b.getAttribute("data-v"),10);
+      var on = v <= n;
+      b.className = on ? "filled" : "";
+      b.setAttribute("aria-checked", v===n ? "true" : "false");
+      b.innerHTML = starSVG(on);
     });
   }
-  document.querySelectorAll("#prioPick button").forEach(function(b){
-    b.addEventListener("click", function(){ setPrio(b.getAttribute("data-p")); });
+  document.querySelectorAll("#starPick button").forEach(function(b){
+    b.addEventListener("click", function(){
+      var v = parseInt(b.getAttribute("data-v"),10);
+      // 今と同じ最大星をもう一度押したら1つ減らす（最低1）
+      setPrio(v===pickPrio && v>1 ? v-1 : v);
+    });
   });
 
   function renderCatPick(){
@@ -697,12 +720,12 @@
       if(!it){ editingId=null; return; }
       document.getElementById("sheetTitle").textContent="編集する";
       inName.value=it.name||""; inPrice.value=it.price||""; inMemo.value=it.memo||""; inUrl.value=it.url||"";
-      setPrio(it.prio||"mid"); pickCat = it.catId || null;
+      setPrio(it.prio||3); pickCat = it.catId || null;
       document.getElementById("delBtn").style.display="block";
     } else {
       document.getElementById("sheetTitle").textContent="追加する";
       inName.value=""; inPrice.value=""; inMemo.value=""; inUrl.value="";
-      setPrio("mid"); pickCat = (catFilter!=="all" && catFilter!=="none") ? catFilter : null;
+      setPrio(3); pickCat = (catFilter!=="all" && catFilter!=="none") ? catFilter : null;
       document.getElementById("delBtn").style.display="none";
     }
     renderCatPick();
@@ -843,6 +866,13 @@
   window.addEventListener("storage", function(e){
     if(e.key===KEY || e.key===CATKEY){ load(); render(); }
   });
+
+  // ---------- PWA: Service Worker 登録（オフライン対応） ----------
+  if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("sw.js").catch(function(){ /* 失敗しても通常動作 */ });
+    });
+  }
 
   // ---------- init ----------
   load();
