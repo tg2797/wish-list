@@ -119,6 +119,32 @@ ok('購入済みのみ', (await page.locator('.item.done').count()) === (await p
 await page.tap('.seg button[data-filter="all"]');
 await page.waitForTimeout(100);
 
+console.log('\n[カテゴリ別サマリー]');
+// 既知データを投入して集計を確認
+await page.evaluate(() => {
+  const data = [
+    { id: 'x1', name: 'ガジェA', price: 10000, prio: 3, catId: 'c1', memo: '', url: '', done: false, created: Date.now() },
+    { id: 'x2', name: 'ガジェB', price: 5000, prio: 2, catId: 'c1', memo: '', url: '', done: true, created: Date.now() - 1 },
+    { id: 'x3', name: '服A', price: 3000, prio: 2, catId: 'c2', memo: '', url: '', done: false, created: Date.now() - 2 },
+  ];
+  localStorage.setItem('wishlist_app_v1', JSON.stringify(data));
+});
+await page.reload({ waitUntil: 'networkidle' });
+ok('すべて: 合計は未購入分', (await page.locator('#totalWant').textContent()) === '¥13,000');
+ok('すべて: 登録数=3', (await page.locator('#statCount').textContent()) === '3');
+await page.locator('.chip[data-cf="c1"]').tap();
+await page.waitForTimeout(100);
+ok('ガジェット: ラベルが「〜の合計」', (await page.locator('#summaryLabel').textContent()).endsWith('の合計'));
+ok('ガジェット: 合計=¥10,000（未購入のみ）', (await page.locator('#totalWant').textContent()) === '¥10,000');
+ok('ガジェット: 登録数=2', (await page.locator('#statCount').textContent()) === '2');
+ok('ガジェット: 購入済み=1', (await page.locator('#statBought').textContent()) === '1');
+await page.locator('.chip[data-cf="c2"]').tap();
+await page.waitForTimeout(100);
+ok('ファッション: 合計=¥3,000', (await page.locator('#totalWant').textContent()) === '¥3,000');
+await page.locator('.chip[data-cf="all"]').tap();
+await page.waitForTimeout(100);
+ok('すべてに戻すとラベルが既定', (await page.locator('#summaryLabel').textContent()) === '欲しいもの合計');
+
 console.log('\n[編集]');
 await page.locator('.item-body').first().tap();
 await page.waitForTimeout(400);

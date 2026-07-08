@@ -270,7 +270,7 @@
 
 <div class="wrap">
   <div class="summary">
-    <div class="label">欲しいもの合計</div>
+    <div class="label" id="summaryLabel">欲しいもの合計</div>
     <div class="total" id="totalWant">¥0</div>
     <div class="row">
       <div class="stat"><div class="n" id="statCount">0</div><div class="t">登録数</div></div>
@@ -491,15 +491,28 @@
 
   // ---------- main render ----------
   function render(){
-    var want = items.filter(function(i){ return !i.done; });
-    var bought = items.filter(function(i){ return i.done; });
+    // 選択中のカテゴリが削除済みなら "すべて" に戻す
+    if(catFilter!=="all" && catFilter!=="none" && !getCat(catFilter)){ catFilter="all"; }
+
+    // サマリーは選択中カテゴリでスコープ（カテゴリを変えるとその合計が見える）
+    var scope = items.filter(function(i){
+      if(catFilter==="none") return !i.catId;
+      if(catFilter!=="all") return i.catId===catFilter;
+      return true;
+    });
+    var want = scope.filter(function(i){ return !i.done; });
+    var bought = scope.filter(function(i){ return i.done; });
     var wantSum = want.reduce(function(a,i){ return a+(i.price||0); },0);
     var boughtSum = bought.reduce(function(a,i){ return a+(i.price||0); },0);
     var totalSum = wantSum + boughtSum;
     var rate = totalSum>0 ? Math.round(boughtSum/totalSum*100) : 0;
 
+    var sLabel = catFilter==="all" ? "欲しいもの合計"
+      : catFilter==="none" ? "未分類の合計"
+      : (getCat(catFilter) ? getCat(catFilter).name + "の合計" : "欲しいもの合計");
+    document.getElementById("summaryLabel").textContent = sLabel;
     document.getElementById("totalWant").textContent = yen(wantSum);
-    document.getElementById("statCount").textContent = items.length;
+    document.getElementById("statCount").textContent = scope.length;
     document.getElementById("statBought").textContent = bought.length;
     document.getElementById("statRate").textContent = rate + "%";
     document.getElementById("progress").style.width = rate + "%";
@@ -507,9 +520,6 @@
     document.getElementById("sortLabel").textContent = sortLabel(sortMode);
 
     renderChips();
-
-    // 選択中のカテゴリが削除済みなら "すべて" に戻す
-    if(catFilter!=="all" && catFilter!=="none" && !getCat(catFilter)){ catFilter="all"; }
 
     // filter by status + category
     var view = items.filter(function(i){
